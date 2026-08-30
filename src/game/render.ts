@@ -118,9 +118,10 @@ function tracePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: numbe
   ctx.closePath();
 }
 
-/** Flat, hard-edged cel shading (base tone + a shadow crescent + a glossy
- *  highlight blob) rather than a smooth photoreal gradient — reads as a
- *  painted toy, not a rendered sphere. `pathFn` draws the silhouette. */
+/** Flat, two-tone cel shading — a solid base fill plus one hard-edged shadow
+ *  patch, no gloss/specular highlight. Real cartoon planets (Kirby, Katamari)
+ *  read as flat-painted, not as a shiny plastic marble. `pathFn` draws the
+ *  silhouette. */
 function fillCelShaded(
   ctx: CanvasRenderingContext2D,
   pathFn: () => void,
@@ -128,7 +129,6 @@ function fillCelShaded(
   y: number,
   r: number,
   base: Rgb,
-  highlight: Rgb,
   shadow: Rgb,
 ): void {
   pathFn();
@@ -139,15 +139,10 @@ function fillCelShaded(
   pathFn();
   ctx.clip();
   ctx.beginPath();
-  ctx.arc(x + r * 0.4, y + r * 0.4, r * 1.05, 0, Math.PI * 2);
-  ctx.fillStyle = toCss(shadow, 0.55);
+  ctx.arc(x + r * 0.45, y + r * 0.4, r * 0.95, 0, Math.PI * 2);
+  ctx.fillStyle = toCss(shadow, 0.45);
   ctx.fill();
   ctx.restore();
-
-  ctx.beginPath();
-  ctx.ellipse(x - r * 0.35, y - r * 0.42, r * 0.32, r * 0.19, -0.5, 0, Math.PI * 2);
-  ctx.fillStyle = toCss(highlight, 0.9);
-  ctx.fill();
 
   pathFn();
   ctx.lineWidth = inkWidth(r);
@@ -314,14 +309,14 @@ function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   if (shape === "crystal") {
     drawCrystal(ctx, x, y, r, seed, base, highlight, shadow);
   } else if (shape === "rocky") {
-    fillCelShaded(ctx, () => tracePath(ctx, x, y, r, seed), x, y, r, base, highlight, shadow);
+    fillCelShaded(ctx, () => tracePath(ctx, x, y, r, seed), x, y, r, base, shadow);
     drawCraters(ctx, x, y, r, seed, shadow);
   } else {
     const path = () => {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
     };
-    fillCelShaded(ctx, path, x, y, r, base, highlight, shadow);
+    fillCelShaded(ctx, path, x, y, r, base, shadow);
     if (shape === "banded") drawBands(ctx, x, y, r, shadow);
   }
 
@@ -345,11 +340,6 @@ function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.lineWidth = inkWidth(r);
   ctx.strokeStyle = INK;
   ctx.stroke();
-
-  ctx.beginPath();
-  ctx.ellipse(x - r * 0.3, y - r * 0.35, r * 0.3, r * 0.18, -0.4, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-  ctx.fill();
 
   const eyeDx = r * 0.32;
   const eyeDy = r * 0.05;

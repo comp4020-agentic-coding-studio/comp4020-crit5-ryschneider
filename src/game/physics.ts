@@ -1,12 +1,12 @@
 import type { InputSnapshot, Planet, PlayerState, Vec2 } from "./types";
 
-const MOVE_ACCEL = 220;
-const MAX_SURFACE_SPEED = 95;
-const JUMP_SPEED = 130;
-const AIR_CONTROL_ACCEL = 40;
+const MOVE_ACCEL = 420;
+const MAX_SURFACE_SPEED = 170;
+const JUMP_SPEED = 180;
+const AIR_CONTROL_ACCEL = 90;
 const SURFACE_SNAP_EPSILON = 0.05;
 /** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
-const FRICTION_DECEL = 260;
+const FRICTION_DECEL = 460;
 /** Even on the iciest planet, input still steers at least this fraction as hard. */
 const MIN_ACCEL_GRIP = 0.3;
 
@@ -144,7 +144,11 @@ export function integrate(
   }
 
   const gravityDir = length(gravity) > 0 ? normalize(gravity) : { x: 0, y: 1 };
-  const airTangent = perp(gravityDir);
+  // Use perp(-gravityDir), matching the grounded tangent's perp(outward) —
+  // outward is "away from the planet" (roughly -gravityDir), so using
+  // perp(gravityDir) directly would flip which way "right" pushes the moment
+  // you leave the ground.
+  const airTangent = perp(scale(gravityDir, -1));
   const vel = add(
     add(player.vel, scale(gravity, dt)),
     scale(airTangent, moveDir * AIR_CONTROL_ACCEL * dt),

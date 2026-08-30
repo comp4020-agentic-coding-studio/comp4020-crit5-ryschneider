@@ -1,10 +1,6 @@
 import type { GameState } from "./types";
 
-const STARS = Array.from({ length: 60 }, (_, i) => ({
-  x: (i * 137) % 960,
-  y: (i * 293) % 540,
-  r: (i % 3) + 1,
-}));
+const STAR_COUNT = 220;
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
   const { width, height } = ctx.canvas;
@@ -13,9 +9,12 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.fillRect(0, 0, width, height);
 
   ctx.fillStyle = "#2a2f45";
-  for (const star of STARS) {
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const x = (i * 137) % width;
+    const y = (i * 293) % height;
+    const r = (i % 3) + 1;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 

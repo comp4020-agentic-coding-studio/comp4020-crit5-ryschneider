@@ -17,9 +17,6 @@ header {
 
 main {
   height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 h1 {
@@ -33,10 +30,10 @@ h1 {
 }
 
 canvas#game {
-  max-width: 100%;
-  max-height: 100vh;
-  width: auto;
-  height: auto;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   display: block;
   background: #05050a;
   touch-action: none;

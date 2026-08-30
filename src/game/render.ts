@@ -329,31 +329,107 @@ function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   }
 }
 
-/** A round cartoon character with a bold outline and a simple face — the
- *  face stays screen-facing (not rotated with the surface) so it always
- *  reads, the way a rolling character's face conventionally does. */
-function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string) {
+/** A small cartoon rocket ship — pointed nose, tapered body, fins and a
+ *  cockpit window — oriented along its direction of travel (or straight
+ *  "up" off the surface while standing still) so the existing acceleration
+ *  mechanic reads as thrust rather than an arbitrary circle sliding around.
+ *  `angle` is the rotation that points the ship's nose at the facing
+ *  direction; `thrust` (0-1) scales the engine flame so speeding up is
+ *  visibly bigger fire, not just a faster-moving dot. */
+function drawPlayer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  fill: string,
+  angle: number,
+  thrust: number,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  if (thrust > 0.05) {
+    const flameLen = r * (0.6 + thrust * 1.3);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.35, r * 0.75);
+    ctx.lineTo(0, r * 0.75 + flameLen);
+    ctx.lineTo(r * 0.35, r * 0.75);
+    ctx.closePath();
+    ctx.fillStyle = "#ffd166";
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, inkWidth(r) * 0.7);
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.moveTo(0, -r * 1.3);
+  ctx.quadraticCurveTo(r * 0.75, -r * 0.5, r * 0.55, r * 0.6);
+  ctx.lineTo(r * 0.4, r * 0.85);
+  ctx.lineTo(-r * 0.4, r * 0.85);
+  ctx.lineTo(-r * 0.55, r * 0.6);
+  ctx.quadraticCurveTo(-r * 0.75, -r * 0.5, 0, -r * 1.3);
+  ctx.closePath();
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = inkWidth(r);
   ctx.strokeStyle = INK;
   ctx.stroke();
 
-  const eyeDx = r * 0.32;
-  const eyeDy = r * 0.05;
-  const eyeR = Math.max(1, r * 0.16);
   for (const dir of [-1, 1]) {
     ctx.beginPath();
-    ctx.arc(x + dir * eyeDx, y + eyeDy, eyeR, 0, Math.PI * 2);
+    ctx.moveTo(dir * r * 0.45, r * 0.2);
+    ctx.lineTo(dir * r * 0.95, r * 0.85);
+    ctx.lineTo(dir * r * 0.35, r * 0.7);
+    ctx.closePath();
     ctx.fillStyle = INK;
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x + dir * eyeDx + eyeR * 0.3, y + eyeDy - eyeR * 0.3, eyeR * 0.35, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
   }
+
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.25, r * 0.32, 0, Math.PI * 2);
+  ctx.fillStyle = "#bfeeff";
+  ctx.fill();
+  ctx.lineWidth = Math.max(1.5, inkWidth(r) * 0.7);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/** Facing direction for the ship: pointing away from the surface while
+ *  grounded (like a rocket standing on a landing pad), or along current
+ *  velocity while airborne. Falls back to "up" when nearly stationary so a
+ *  freshly-spawned or momentarily-still ship doesn't point somewhere random. */
+function shipAngle(state: GameState): number {
+  const { player, planets } = state;
+  let fx = 0;
+  let fy = -1;
+
+  if (player.grounded && player.groundedPlanetId) {
+    const ground = planets.find((p) => p.id === player.groundedPlanetId);
+    if (ground) {
+      const dx = player.pos.x - ground.pos.x;
+      const dy = player.pos.y - ground.pos.y;
+      const len = Math.hypot(dx, dy) || 1;
+      fx = dx / len;
+      fy = dy / len;
+    }
+  } else {
+    const speed = Math.hypot(player.vel.x, player.vel.y);
+    if (speed > 1) {
+      fx = player.vel.x / speed;
+      fy = player.vel.y / speed;
+    }
+  }
+
+  return Math.atan2(fx, -fy);
+}
+
+function shipThrust(state: GameState): number {
+  const speed = Math.hypot(state.player.vel.x, state.player.vel.y);
+  return Math.max(0, Math.min(1, speed / (state.player.radius * 20)));
 }
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
@@ -374,6 +450,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
     state.player.pos.y,
     state.player.radius,
     flash ?? "#ff5d73",
+    shipAngle(state),
+    shipThrust(state),
   );
 
   if (flash) {

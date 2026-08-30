@@ -1,14 +1,26 @@
 import type { InputSnapshot, Planet, PlayerState, Vec2 } from "./types";
 
-const MOVE_ACCEL = 420;
-const MAX_SURFACE_SPEED = 170;
-const JUMP_SPEED = 180;
-const AIR_CONTROL_ACCEL = 90;
+// Movement constants are expressed per unit of player radius (not raw pixels)
+// so the ship's speed scales along with the world instead of feeling weaker
+// on a bigger window — `rules.ts` scales the whole layout, player included,
+// to fill whatever screen it's given.
+const MOVE_ACCEL_PER_RADIUS = 130;
+const MAX_SURFACE_SPEED_PER_RADIUS = 42;
+const JUMP_SPEED_PER_RADIUS = 24;
+const AIR_CONTROL_ACCEL_PER_RADIUS = 36;
 const SURFACE_SNAP_EPSILON = 0.05;
 /** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
-const FRICTION_DECEL = 460;
+const FRICTION_DECEL_PER_RADIUS = 70;
 /** Even on the iciest planet, input still steers at least this fraction as hard. */
 const MIN_ACCEL_GRIP = 0.3;
+/** Blanket multiplier on every planet's pull — tuned so gravity reads as a
+ *  real force fighting the ship's thrust, not a faint nudge. Multiplied by
+ *  the planet's own (world-scaled) pixel radius so gravity's strength scales
+ *  with the window the same way `player.radius`-relative movement does —
+ *  without that, a fixed absolute acceleration falls behind a jump speed
+ *  that grows linearly with scale, and a straight-up jump can outrun
+ *  gravity entirely on a large enough window. */
+const GRAVITY_MULTIPLIER = 0.55;
 
 function subtract(a: Vec2, b: Vec2): Vec2 {
   return { x: a.x - b.x, y: a.y - b.y };
@@ -57,7 +69,8 @@ export function gravityAt(pos: Vec2, planets: Planet[]): Vec2 {
       const toPlanet = subtract(planet.pos, pos);
       const rawDist = length(toPlanet);
       const distInRadii = Math.max(rawDist / planet.radius, 1);
-      const strength = planet.mass / (distInRadii * distInRadii);
+      const strength =
+        (planet.mass * GRAVITY_MULTIPLIER * planet.radius) / (distInRadii * distInRadii);
       return add(total, scale(normalize(toPlanet), strength));
     },
     { x: 0, y: 0 },
@@ -92,6 +105,11 @@ export function integrate(
   groundedPlanet: Planet | null,
 ): PlayerState {
   const moveDir = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+  const moveAccel = MOVE_ACCEL_PER_RADIUS * player.radius;
+  const maxSurfaceSpeed = MAX_SURFACE_SPEED_PER_RADIUS * player.radius;
+  const jumpSpeed = JUMP_SPEED_PER_RADIUS * player.radius;
+  const airControlAccel = AIR_CONTROL_ACCEL_PER_RADIUS * player.radius;
+  const frictionDecel = FRICTION_DECEL_PER_RADIUS * player.radius;
 
   if (groundedPlanet) {
     const outward = normalize(subtract(player.pos, groundedPlanet.pos));
@@ -99,7 +117,7 @@ export function integrate(
 
     if (input.jumpPressedThisFrame) {
       const tangentialSpeed = dot(player.vel, tangent);
-      const vel = add(scale(outward, JUMP_SPEED), scale(tangent, tangentialSpeed));
+      const vel = add(scale(outward, jumpSpeed), scale(tangent, tangentialSpeed));
       return {
         ...player,
         vel,
@@ -111,17 +129,17 @@ export function integrate(
 
     const friction = groundedPlanet.friction ?? 1;
     const accelGrip = Math.max(friction, MIN_ACCEL_GRIP);
-    let rawSpeed = dot(player.vel, tangent) + moveDir * MOVE_ACCEL * accelGrip * dt;
+    let rawSpeed = dot(player.vel, tangent) + moveDir * moveAccel * accelGrip * dt;
 
     // Friction only bleeds off speed the player isn't actively driving with
     // input — otherwise holding a direction into high friction would fight
     // its own acceleration instead of just capping top speed.
     if (moveDir === 0) {
-      const decel = FRICTION_DECEL * friction * dt;
+      const decel = frictionDecel * friction * dt;
       rawSpeed = rawSpeed > 0 ? Math.max(0, rawSpeed - decel) : Math.min(0, rawSpeed + decel);
     }
 
-    const tangentialSpeed = Math.max(-MAX_SURFACE_SPEED, Math.min(MAX_SURFACE_SPEED, rawSpeed));
+    const tangentialSpeed = Math.max(-maxSurfaceSpeed, Math.min(maxSurfaceSpeed, rawSpeed));
     const vel = scale(tangent, tangentialSpeed);
     const restRadius = groundedPlanet.radius + player.radius;
 
@@ -151,7 +169,7 @@ export function integrate(
   const airTangent = perp(scale(gravityDir, -1));
   const vel = add(
     add(player.vel, scale(gravity, dt)),
-    scale(airTangent, moveDir * AIR_CONTROL_ACCEL * dt),
+    scale(airTangent, moveDir * airControlAccel * dt),
   );
 
   return {

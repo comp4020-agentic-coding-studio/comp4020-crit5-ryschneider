@@ -20,13 +20,13 @@ function planet(
  * The single source of truth for both first load and every restart.
  *
  * `width`/`height` are the actual canvas size (the full browser window, so
- * the game fills it edge to edge). The tuned layout only ever shrinks to
- * fit inside a smaller-than-reference window and is otherwise centered
- * as-is at 1:1 scale, so a bigger window just means more visible space
- * around the planets rather than stretched-out gravity/movement feel.
+ * the game fills it edge to edge). The tuned layout scales up or down to
+ * fit whatever window it's given — movement/gravity constants in
+ * `physics.ts` are expressed relative to the (also-scaled) player radius,
+ * so a bigger window fills with more world rather than just more margin.
  */
 export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): GameState {
-  const scale = Math.min(1, width / REF_WIDTH, height / REF_HEIGHT);
+  const scale = Math.min(width / REF_WIDTH, height / REF_HEIGHT);
   const offsetX = (width - REF_WIDTH * scale) / 2;
   const offsetY = (height - REF_HEIGHT * scale) / 2;
   const at = (x: number, y: number): Vec2 => ({ x: offsetX + x * scale, y: offsetY + y * scale });

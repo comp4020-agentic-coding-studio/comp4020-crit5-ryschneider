@@ -9,6 +9,10 @@ export interface Planet {
   radius: number;
   mass: number;
   isGoal: boolean;
+  /** Base surface colour for rendering; falls back to a default if omitted. */
+  color?: string;
+  /** Draws a Saturn-style ring behind the sphere. */
+  ring?: boolean;
 }
 
 export interface PlayerState {

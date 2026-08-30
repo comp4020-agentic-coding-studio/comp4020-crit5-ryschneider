@@ -4,8 +4,16 @@ import type { GameState, Planet, Vec2 } from "./types";
 const REF_WIDTH = 960;
 const REF_HEIGHT = 540;
 
-function planet(id: string, pos: Vec2, radius: number, mass: number, isGoal = false): Planet {
-  return { id, pos, radius, mass, isGoal };
+function planet(
+  id: string,
+  pos: Vec2,
+  radius: number,
+  mass: number,
+  isGoal = false,
+  color?: string,
+  ring?: boolean,
+): Planet {
+  return { id, pos, radius, mass, isGoal, color, ring };
 }
 
 /**
@@ -24,9 +32,13 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
   const at = (x: number, y: number): Vec2 => ({ x: offsetX + x * scale, y: offsetY + y * scale });
 
   const planets: Planet[] = [
-    planet("start", at(220, 340), 70 * scale, 260),
-    planet("mid", at(500, 220), 50 * scale, 190),
-    planet("goal", at(760, 360), 60 * scale, 230, true),
+    planet("start", at(220, 340), 70 * scale, 260, false, "#d98a5f"),
+    planet("zephyr", at(400, 70), 30 * scale, 110, false, "#8fe0c4"),
+    planet("mid", at(500, 220), 50 * scale, 190, false, "#4fa5c9"),
+    planet("aurora", at(80, 150), 38 * scale, 140, false, "#9b7fd4"),
+    planet("ember", at(650, 480), 45 * scale, 170, false, "#e0b878", true),
+    planet("outpost", at(900, 500), 35 * scale, 130, false, "#e8829a"),
+    planet("goal", at(760, 360), 60 * scale, 230, true, "#ffd166"),
   ];
 
   const startPlanet = planets[0]!;

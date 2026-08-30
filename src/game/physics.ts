@@ -111,7 +111,15 @@ export function integrate(
     );
     const vel = scale(tangent, tangentialSpeed);
     const restRadius = groundedPlanet.radius + player.radius;
-    const pos = add(groundedPlanet.pos, scale(outward, restRadius));
+
+    // Re-derive "outward" from the moved-along-tangent point, then snap that
+    // back onto the surface circle — this is what actually walks the player
+    // around the curve. Reusing the pre-move `outward` here would silently
+    // reproject the OLD position onto itself every frame, so left/right did
+    // nothing while grounded even though `vel` was changing correctly.
+    const moved = add(player.pos, scale(tangent, tangentialSpeed * dt));
+    const rolledOutward = normalize(subtract(moved, groundedPlanet.pos));
+    const pos = add(groundedPlanet.pos, scale(rolledOutward, restRadius));
 
     return {
       ...player,

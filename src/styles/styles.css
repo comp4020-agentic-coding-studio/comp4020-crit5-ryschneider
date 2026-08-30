@@ -1,16 +1,47 @@
+html,
 body {
   margin: 0;
-  padding: 2rem;
+  height: 100%;
+  overflow: hidden;
   font-family: system-ui, sans-serif;
-  line-height: 1.6;
-  color: #1a1a1a;
+  color: #e8e8f0;
+  background: #05050a;
+}
+
+header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  padding: 0.5rem 1rem;
+  z-index: 1;
 }
 
 main {
-  max-width: 40rem;
-  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+h1 {
+  position: absolute;
+  top: 0.5rem;
+  right: 1rem;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+canvas#game {
+  max-width: 100%;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  display: block;
+  background: #05050a;
+  touch-action: none;
 }
 
 a {
-  color: #0b5fff;
+  color: #8fb8ff;
 }

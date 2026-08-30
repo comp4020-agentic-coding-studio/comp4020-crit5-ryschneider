@@ -1,61 +1,47 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and its
-[word counts](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#word-counts)
-cover every deliverable.
-
-## What I built
-
-One paragraph: the thing, and the idea behind it.
+**Gravity Hop**: a 2D side-view world of small planets, each with its own
+local gravity. Walk a planet's curved surface, jump, get pulled toward
+whichever planet dominates mid-air, land on the gold goal planet to win or
+drift past the world's edge to lose. Single static screen, no camera, no
+on-screen or off-screen instructions — the mechanic and the ending are meant
+to read from the shapes and colours alone.
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+1. **Picking the one mechanic, deliberately narrow.** The brief only fixes
+   "one focused mechanic"; the shape of it was mine to choose. I turned down
+   plane-shifting, rag-doll physics and grab-swing (all offered as options)
+   for planets-with-gravity, and then cut a scrolling camera in favour of a
+   static single screen specifically to keep a one-week prototype from
+   spending its budget on a camera subsystem instead of the gravity feel
+   itself. That scope call is why the whole prototype is one screen wide.
+   [`5391401`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-ryschneider/commit/5391401)
 
-1. **what happened** --- the problem, or the thing that went wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+2. **Architecture chosen to make the one required test possible, not
+   bolted on after.** The spec asks for one game rule under a focused
+   automated test. Rather than write the game as a single canvas+rAF blob
+   and then dig a test out of it, gravity/landing/win-loss logic went into
+   `physics.ts`/`rules.ts` with zero DOM dependency from the start, so
+   `spec/crit-5.test.ts` imports `gravityAt` directly and asserts the
+   sum-of-pulls rule with no browser involved.
+   [`5391401`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-ryschneider/commit/5391401)
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** --- the standards and checks your work has to satisfy
---- rather than in a retry: a rule added to `CLAUDE.md`, a check wired up, an
-attempt thrown away. Retrying until it passes is the routine case, and changing
-what the work runs against is the skilled one.
-
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
-
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
-
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
-
-> the prompt, verbatim
-
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
+3. **A green suite hid a genuinely broken game.** Typecheck, build and the
+   gravity test all stayed green while the game was, in practice, unplayable
+   — a single jump sent the player off the top of the canvas in a straight
+   line, because gravity was scaled directly against raw pixel distance
+   (`mass / rawDistance²`), which worked out to roughly 0.015 px/s² of pull
+   at real gameplay distances against 160+ px/s jump speeds. Nothing in
+   `pnpm check` exercises *feel*, only shape, so I only found this by driving
+   a headless Chromium against the running dev server and watching the
+   trajectory across several screenshots. The fix was rescaling gravity by
+   each planet's own radius rather than absolute pixels, and retuning
+   move/jump speed to match; re-running the same playtest afterwards showed
+   the jump now arcing over one planet and being captured by the next,
+   landing on the goal planet for a confirmed win and, on a jump aimed away
+   from every planet, drifting past the world bounds for a confirmed loss.
+   [`5391401`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-ryschneider/commit/5391401)
 
 ## Before you ship
 

@@ -6,7 +6,21 @@ import type { InputSnapshot, Planet, PlayerState, Vec2 } from "./types";
 // to fill whatever screen it's given.
 const MOVE_ACCEL_PER_RADIUS = 50;
 const MAX_SURFACE_SPEED_PER_RADIUS = 42;
-const JUMP_SPEED_PER_RADIUS = 24;
+/** Continuous outward thrust, same mechanic as left/right — no instant
+ *  impulse, just acceleration for as long as "up" is held. Tuned above the
+ *  strongest planet's own surface gravity (see `GRAVITY_MULTIPLIER`'s note)
+ *  so sustained thrust always wins the tug-of-war right at the surface. */
+const UP_ACCEL_PER_RADIUS = 800;
+/** Ascent speed cap, same idea as `MAX_SURFACE_SPEED_PER_RADIUS` — without
+ *  one, thrust racing a gravity well this strong blows up to absurd speeds
+ *  within a fraction of a second. A capped cruise still escapes: as long as
+ *  thrust keeps winning at the surface, holding "up" keeps carrying the
+ *  player further out, and a planet's escape velocity keeps shrinking with
+ *  distance — so the (comparatively modest) capped speed eventually clears
+ *  it, just a little further out rather than instantly. Kept close to the
+ *  old one-shot jump's speed so ascending reads as the same kind of hop,
+ *  just sustained instead of instantaneous. */
+const MAX_ASCENT_SPEED_PER_RADIUS = 26;
 const AIR_CONTROL_ACCEL_PER_RADIUS = 14;
 const SURFACE_SNAP_EPSILON = 0.05;
 /** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
@@ -107,26 +121,14 @@ export function integrate(
   const moveDir = ((input.left ? -1 : 0) + (input.right ? 1 : 0)) as -1 | 0 | 1;
   const moveAccel = MOVE_ACCEL_PER_RADIUS * player.radius;
   const maxSurfaceSpeed = MAX_SURFACE_SPEED_PER_RADIUS * player.radius;
-  const jumpSpeed = JUMP_SPEED_PER_RADIUS * player.radius;
+  const upAccel = UP_ACCEL_PER_RADIUS * player.radius;
+  const maxAscentSpeed = MAX_ASCENT_SPEED_PER_RADIUS * player.radius;
   const airControlAccel = AIR_CONTROL_ACCEL_PER_RADIUS * player.radius;
   const frictionDecel = FRICTION_DECEL_PER_RADIUS * player.radius;
 
-  if (groundedPlanet) {
+  if (groundedPlanet && !input.up) {
     const outward = normalize(subtract(player.pos, groundedPlanet.pos));
     const tangent = perp(outward);
-
-    if (input.jumpPressedThisFrame) {
-      const tangentialSpeed = dot(player.vel, tangent);
-      const vel = add(scale(outward, jumpSpeed), scale(tangent, tangentialSpeed));
-      return {
-        ...player,
-        vel,
-        pos: add(player.pos, scale(vel, dt)),
-        grounded: false,
-        groundedPlanetId: null,
-        thrustDir: moveDir,
-      };
-    }
 
     const friction = groundedPlanet.friction ?? 1;
     const accelGrip = Math.max(friction, MIN_ACCEL_GRIP);
@@ -169,10 +171,25 @@ export function integrate(
   // perp(gravityDir) directly would flip which way "right" pushes the moment
   // you leave the ground.
   const airTangent = perp(scale(gravityDir, -1));
-  const vel = add(
+  let vel = add(
     add(player.vel, scale(gravity, dt)),
     scale(airTangent, moveDir * airControlAccel * dt),
   );
+
+  if (input.up) {
+    // Thrusting straight off a surface still under the player's feet pushes
+    // along that surface's own normal; already-airborne thrust pushes
+    // against whatever's currently pulling hardest, since there's no single
+    // "the" surface left to push away from.
+    const upDir = groundedPlanet
+      ? normalize(subtract(player.pos, groundedPlanet.pos))
+      : scale(gravityDir, -1);
+    const thrust = add(vel, scale(upDir, upAccel * dt));
+    // Cap only the outward-along-upDir component, same as the tangential
+    // speed cap while grounded — sideways/gravity motion isn't touched.
+    const alongUp = dot(thrust, upDir);
+    vel = alongUp > maxAscentSpeed ? add(thrust, scale(upDir, maxAscentSpeed - alongUp)) : thrust;
+  }
 
   return {
     ...player,

@@ -327,21 +327,6 @@ function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
 
   if (planet.ring) drawRing(ctx, x, y, r, base);
 
-  if (planet.isGoal) {
-    const beams = 8;
-    ctx.save();
-    for (let i = 0; i < beams; i++) {
-      const angle = (i / beams) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(x + Math.cos(angle) * r * 1.15, y + Math.sin(angle) * r * 1.15);
-      ctx.lineTo(x + Math.cos(angle) * r * 1.7, y + Math.sin(angle) * r * 1.7);
-      ctx.lineWidth = Math.max(2, r * 0.1);
-      ctx.strokeStyle = "rgba(255, 214, 102, 0.55)";
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   if (shape === "crystal") {
     drawCrystal(ctx, x, y, r, seed, base, highlight, shadow);
   } else if (shape === "rocky") {

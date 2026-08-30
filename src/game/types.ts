@@ -59,5 +59,8 @@ export interface GameState {
 export interface InputSnapshot {
   left: boolean;
   right: boolean;
-  jumpPressedThisFrame: boolean;
+  /** Held state, same as `left`/`right` — thrusts outward, away from
+   *  whichever planet is holding the player down (or the net pull while
+   *  already airborne), for as long as it's held. */
+  up: boolean;
 }

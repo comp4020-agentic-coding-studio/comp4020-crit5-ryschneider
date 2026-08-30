@@ -11,7 +11,7 @@ function planet(
   mass: number,
   isGoal = false,
   color?: string,
-  opts: Pick<Planet, "ring" | "shape" | "friction" | "lethal"> = {},
+  opts: Pick<Planet, "ring" | "shape" | "friction"> = {},
 ): Planet {
   return { id, pos, radius, mass, isGoal, color, ...opts };
 }
@@ -49,11 +49,8 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
       shape: "rocky",
       friction: 1.3,
     }),
-    // A small, strongly-pulling void guarding the direct line between "mid"
-    // and "goal" — still summed into gravityAt like any other planet, but
-    // checkOutcome kills on contact instead of letting you land on it.
-    planet("void", at(650, 120), 25 * scale, 380, false, "#0a0612", {
-      lethal: true,
+    planet("void", at(650, 120), 40 * scale, 200, false, "#a78bfa", {
+      shape: "banded",
     }),
     planet("goal", at(810, 180), 60 * scale, 230, true, "#ffd166", {
       shape: "round",
@@ -74,6 +71,7 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
       grounded: true,
       groundedPlanetId: startPlanet.id,
       thrustDir: 0,
+      ascending: false,
     },
     outcome: "playing",
     worldBounds: {
@@ -87,25 +85,13 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
 }
 
 /** Win: landed on the goal planet. Loss: drifted past the world bounds with
- *  no planet's gravity having recaptured the player, or touched a lethal
- *  planet (a black hole) outright. */
+ *  no planet's gravity having recaptured the player. */
 export function checkOutcome(state: GameState): GameState["outcome"] {
   if (state.outcome !== "playing") return state.outcome;
 
   const goal = state.planets.find((p) => p.isGoal);
   if (goal && state.player.grounded && state.player.groundedPlanetId === goal.id) {
     return "won";
-  }
-
-  // Checked by raw overlap distance rather than the `grounded` flag, so a
-  // last-instant jump the same frame you touch it can't dodge death.
-  for (const hazard of state.planets) {
-    if (!hazard.lethal) continue;
-    const dx = state.player.pos.x - hazard.pos.x;
-    const dy = state.player.pos.y - hazard.pos.y;
-    if (Math.hypot(dx, dy) <= hazard.radius + state.player.radius) {
-      return "lost";
-    }
   }
 
   const { minX, maxX, minY, maxY, margin } = state.worldBounds;

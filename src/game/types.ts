@@ -21,9 +21,6 @@ export interface Planet {
    *  planet) mean weak acceleration and almost no stopping friction, so the
    *  player keeps sliding. Falls back to 1 if omitted. */
   friction?: number;
-  /** A black hole: still pulls like any other planet (usually harder), but
-   *  touching it is instant death rather than something you can land on. */
-  lethal?: boolean;
 }
 
 export interface PlayerState {
@@ -37,6 +34,11 @@ export interface PlayerState {
    *  independent of whether that thrust is actually still changing speed
    *  (e.g. already at max surface speed). */
   thrustDir: -1 | 0 | 1;
+  /** Whether outward thrust is being applied this physics step, straight
+   *  from input — drives the main-engine flame in render.ts. Kept separate
+   *  from raw speed so the flame only shows while "up" is actually held,
+   *  not whenever the ship happens to be moving fast (falling, spinning). */
+  ascending: boolean;
 }
 
 export type Outcome = "playing" | "won" | "lost";

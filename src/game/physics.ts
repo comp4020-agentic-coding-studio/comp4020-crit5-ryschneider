@@ -5,22 +5,26 @@ import type { InputSnapshot, Planet, PlayerState, Vec2 } from "./types";
 // on a bigger window — `rules.ts` scales the whole layout, player included,
 // to fill whatever screen it's given.
 const MOVE_ACCEL_PER_RADIUS = 50;
-const MAX_SURFACE_SPEED_PER_RADIUS = 42;
+/** Top surface-rolling speed. Set above every planet's own spin-off
+ *  threshold (`sqrt(surfaceGravity * restRadius)`, strongest on "start" at
+ *  roughly 65 per radius) so spinning up to max speed on any planet is
+ *  enough to outrun its gravity and fly off the curve — see the centripetal
+ *  check in the grounded branch of `integrate`. */
+const MAX_SURFACE_SPEED_PER_RADIUS = 72;
 /** Continuous outward thrust, same mechanic as left/right — no instant
  *  impulse, just acceleration for as long as "up" is held. Tuned above the
  *  strongest planet's own surface gravity (see `GRAVITY_MULTIPLIER`'s note)
  *  so sustained thrust always wins the tug-of-war right at the surface. */
-const UP_ACCEL_PER_RADIUS = 800;
+const UP_ACCEL_PER_RADIUS = 780;
 /** Ascent speed cap, same idea as `MAX_SURFACE_SPEED_PER_RADIUS` — without
  *  one, thrust racing a gravity well this strong blows up to absurd speeds
  *  within a fraction of a second. A capped cruise still escapes: as long as
  *  thrust keeps winning at the surface, holding "up" keeps carrying the
  *  player further out, and a planet's escape velocity keeps shrinking with
  *  distance — so the (comparatively modest) capped speed eventually clears
- *  it, just a little further out rather than instantly. Kept close to the
- *  old one-shot jump's speed so ascending reads as the same kind of hop,
- *  just sustained instead of instantaneous. */
-const MAX_ASCENT_SPEED_PER_RADIUS = 26;
+ *  it, just further out and more gradually rather than instantly. Kept low
+ *  so ascending reads as a slow, deliberate climb rather than a rocket punch. */
+const MAX_ASCENT_SPEED_PER_RADIUS = 16;
 const AIR_CONTROL_ACCEL_PER_RADIUS = 14;
 const SURFACE_SNAP_EPSILON = 0.05;
 /** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
@@ -146,6 +150,25 @@ export function integrate(
     const vel = scale(tangent, tangentialSpeed);
     const restRadius = groundedPlanet.radius + player.radius;
 
+    // Circular motion needs gravity's inward pull to supply the centripetal
+    // force `v^2 / restRadius`. Spin fast enough on a curve this tight and
+    // there isn't enough inward pull left to hold the player to it — same
+    // physics as a car losing a corner too fast — so let go of the surface
+    // and fly off tangentially instead of snapping back onto the circle.
+    const inwardAccel = Math.max(0, -dot(gravity, outward));
+    const requiredCentripetal = (tangentialSpeed * tangentialSpeed) / restRadius;
+    if (requiredCentripetal > inwardAccel) {
+      return {
+        ...player,
+        vel,
+        pos: add(player.pos, scale(vel, dt)),
+        grounded: false,
+        groundedPlanetId: null,
+        thrustDir: moveDir,
+        ascending: false,
+      };
+    }
+
     // Re-derive "outward" from the moved-along-tangent point, then snap that
     // back onto the surface circle — this is what actually walks the player
     // around the curve. Reusing the pre-move `outward` here would silently
@@ -162,6 +185,7 @@ export function integrate(
       grounded: true,
       groundedPlanetId: groundedPlanet.id,
       thrustDir: moveDir,
+      ascending: false,
     };
   }
 
@@ -198,5 +222,6 @@ export function integrate(
     grounded: false,
     groundedPlanetId: null,
     thrustDir: moveDir,
+    ascending: input.up,
   };
 }

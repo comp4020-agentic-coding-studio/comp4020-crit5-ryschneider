@@ -99,8 +99,8 @@ function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number): 
  *  touching the surface. */
 function tracePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seed: number) {
   const points = 28;
-  const a1 = 0.05 + rand01(seed + 1) * 0.05;
-  const a2 = 0.03 + rand01(seed + 2) * 0.04;
+  const a1 = 0.02 + rand01(seed + 1) * 0.02;
+  const a2 = 0.015 + rand01(seed + 2) * 0.015;
   const f1 = 2 + Math.floor(rand01(seed + 3) * 3);
   const f2 = 4 + Math.floor(rand01(seed + 4) * 3);
   const p1 = rand01(seed + 5) * Math.PI * 2;
@@ -220,7 +220,7 @@ function drawCrystal(
   const verts: { x: number; y: number }[] = [];
   for (let i = 0; i < sides; i++) {
     const angle = (i / sides) * Math.PI * 2 + rotation;
-    const rr = r * (0.82 + rand01(seed + 50 + i) * 0.28);
+    const rr = r * (0.94 + rand01(seed + 50 + i) * 0.08);
     verts.push({ x: x + Math.cos(angle) * rr, y: y + Math.sin(angle) * rr });
   }
 
@@ -278,46 +278,11 @@ function drawRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number
   ctx.restore();
 }
 
-/** A black hole: a dark core, a violet accretion-glow halo, and a couple of
- *  swept arcs standing in for an accretion disk — deliberately unlike every
- *  other planet's cel-shaded look, so it reads as "don't land here" at a
- *  glance rather than as just another stop. */
-function drawBlackHole(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  const glow = ctx.createRadialGradient(x, y, r * 0.4, x, y, r * 2);
-  glow.addColorStop(0, "rgba(150, 80, 220, 0.55)");
-  glow.addColorStop(1, "rgba(150, 80, 220, 0)");
-  ctx.beginPath();
-  ctx.arc(x, y, r * 2, 0, Math.PI * 2);
-  ctx.fillStyle = glow;
-  ctx.fill();
-
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.ellipse(x, y, r * (1.25 + i * 0.3), r * (0.4 + i * 0.1), -0.3, 0, Math.PI * 1.3);
-    ctx.lineWidth = Math.max(1.5, r * 0.06);
-    ctx.strokeStyle = "rgba(200, 150, 255, 0.65)";
-    ctx.stroke();
-  }
-
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = "#0a0612";
-  ctx.fill();
-  ctx.lineWidth = inkWidth(r);
-  ctx.strokeStyle = INK;
-  ctx.stroke();
-}
-
 /** A cel-shaded, textured planet — round, rocky, banded or a faceted
  *  crystal — with a bold cartoon ink outline and an optional ring. */
 function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   const { x, y } = planet.pos;
   const r = planet.radius;
-
-  if (planet.lethal) {
-    drawBlackHole(ctx, x, y, r);
-    return;
-  }
 
   const seed = hashId(planet.id);
   const base = hexToRgb(planet.color ?? DEFAULT_PLANET_COLOR);
@@ -355,11 +320,11 @@ function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
  *  travel (or straight "up" off the surface while standing still) so the
  *  existing acceleration mechanic reads as thrust rather than an arbitrary
  *  circle sliding around. `angle` is the rotation that points the ship's
- *  nose at the facing direction; `thrust` (0-1) scales the main engine
- *  flame so speeding up is visibly bigger fire, not just a faster-moving
- *  dot; `thrustDir` fires the opposite-side pod (real RCS thrusters push by
- *  venting away from the direction you want to move) whenever left/right is
- *  actually held, independent of `thrust`. */
+ *  nose at the facing direction; `thrust` shows the main engine flame only
+ *  while outward thrust ("up") is actually being held, not just whenever
+ *  the ship happens to be moving fast; `thrustDir` fires the opposite-side
+ *  pod (real RCS thrusters push by venting away from the direction you want
+ *  to move) whenever left/right is actually held, independent of `thrust`. */
 function drawPlayer(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -486,8 +451,7 @@ function shipAngle(state: GameState): number {
 }
 
 function shipThrust(state: GameState): number {
-  const speed = Math.hypot(state.player.vel.x, state.player.vel.y);
-  return Math.max(0, Math.min(1, speed / (state.player.radius * 20)));
+  return state.player.ascending ? 1 : 0;
 }
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState): void {

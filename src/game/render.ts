@@ -1,7 +1,9 @@
 import type { GameState, Planet } from "./types";
 
-const SPARKLE_COUNT = 140;
+const SPARKLE_COUNT = 40;
+const CLOUD_COUNT = 5;
 const DEFAULT_PLANET_COLOR = "#4fa5c9";
+const INK = "#1d2b53";
 
 type Rgb = [number, number, number];
 
@@ -31,7 +33,32 @@ function rand01(seed: number): number {
   return x - Math.floor(x);
 }
 
-/** Bright, pastel sky-and-sparkles backdrop rather than a dark starfield. */
+function inkWidth(r: number): number {
+  return Math.max(2, r * 0.09);
+}
+
+/** A puffy cartoon cloud: a cluster of overlapping outlined circles. */
+function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
+  const puffs = [
+    { dx: -0.9, dy: 0.1, r: 0.55 },
+    { dx: -0.3, dy: -0.25, r: 0.7 },
+    { dx: 0.35, dy: -0.15, r: 0.65 },
+    { dx: 0.9, dy: 0.15, r: 0.5 },
+    { dx: 0, dy: 0.3, r: 0.75 },
+  ];
+  ctx.beginPath();
+  for (const p of puffs) {
+    ctx.moveTo(x + p.dx * scale + p.r * scale, y + p.dy * scale);
+    ctx.arc(x + p.dx * scale, y + p.dy * scale, p.r * scale, 0, Math.PI * 2);
+  }
+  ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.fill("nonzero");
+  ctx.lineWidth = Math.max(1.5, scale * 0.06);
+  ctx.strokeStyle = "rgba(180, 205, 235, 0.7)";
+  ctx.stroke();
+}
+
+/** Bright, pastel sky with cartoon clouds and little star-sparkles. */
 function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number): void {
   const sky = ctx.createLinearGradient(0, 0, 0, height);
   sky.addColorStop(0, "#bfe4ff");
@@ -40,13 +67,28 @@ function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number): 
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+  for (let i = 0; i < CLOUD_COUNT; i++) {
+    const cx = ((i * 337 + 120) % (width + 200)) - 100;
+    const cy = (i * 173 + 40) % Math.max(1, height * 0.6);
+    const scale = 22 + (i % 3) * 10;
+    drawCloud(ctx, cx, cy, scale);
+  }
+
   for (let i = 0; i < SPARKLE_COUNT; i++) {
     const x = (i * 197) % width;
     const y = (i * 331 + i * i * 7) % height;
-    const r = (i % 3) * 0.6 + 0.6;
+    const r = (i % 3) * 1.1 + 1.4;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.3, y - r * 0.3);
+    ctx.lineTo(x + r, y);
+    ctx.lineTo(x + r * 0.3, y + r * 0.3);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * 0.3, y + r * 0.3);
+    ctx.lineTo(x - r, y);
+    ctx.lineTo(x - r * 0.3, y - r * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
     ctx.fill();
   }
 }
@@ -76,7 +118,44 @@ function tracePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: numbe
   ctx.closePath();
 }
 
-/** A few darker pockmarks, scattered deterministically, for a rocky texture. */
+/** Flat, hard-edged cel shading (base tone + a shadow crescent + a glossy
+ *  highlight blob) rather than a smooth photoreal gradient — reads as a
+ *  painted toy, not a rendered sphere. `pathFn` draws the silhouette. */
+function fillCelShaded(
+  ctx: CanvasRenderingContext2D,
+  pathFn: () => void,
+  x: number,
+  y: number,
+  r: number,
+  base: Rgb,
+  highlight: Rgb,
+  shadow: Rgb,
+): void {
+  pathFn();
+  ctx.fillStyle = toCss(base);
+  ctx.fill();
+
+  ctx.save();
+  pathFn();
+  ctx.clip();
+  ctx.beginPath();
+  ctx.arc(x + r * 0.4, y + r * 0.4, r * 1.05, 0, Math.PI * 2);
+  ctx.fillStyle = toCss(shadow, 0.55);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.ellipse(x - r * 0.35, y - r * 0.42, r * 0.32, r * 0.19, -0.5, 0, Math.PI * 2);
+  ctx.fillStyle = toCss(highlight, 0.9);
+  ctx.fill();
+
+  pathFn();
+  ctx.lineWidth = inkWidth(r);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+}
+
+/** A few outlined pockmarks, scattered deterministically, for a rocky texture. */
 function drawCraters(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -89,23 +168,25 @@ function drawCraters(
   for (let i = 0; i < count; i++) {
     const angle = rand01(seed + 20 + i) * Math.PI * 2;
     const dist = rand01(seed + 30 + i) * r * 0.5;
-    const cr = r * (0.12 + rand01(seed + 40 + i) * 0.12);
+    const cr = r * (0.14 + rand01(seed + 40 + i) * 0.12);
     const cx = x + Math.cos(angle) * dist;
     const cy = y + Math.sin(angle) * dist;
     ctx.beginPath();
     ctx.ellipse(cx, cy, cr, cr * 0.8, angle, 0, Math.PI * 2);
-    ctx.fillStyle = toCss(shadow, 0.35);
+    ctx.fillStyle = toCss(shadow, 0.6);
     ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    ctx.strokeStyle = toCss(shadow, 0.9);
+    ctx.stroke();
   }
 }
 
-/** Horizontal-ish stripe bands clipped to the sphere, gas-giant style. */
+/** Bold, outlined horizontal stripe bands clipped to the sphere. */
 function drawBands(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   r: number,
-  highlight: Rgb,
   shadow: Rgb,
 ): void {
   ctx.save();
@@ -117,15 +198,18 @@ function drawBands(
     const t = (i + 0.5) / bandCount;
     const by = y - r + t * 2 * r;
     ctx.beginPath();
-    ctx.ellipse(x, by, r * 1.05, r * 0.14, 0, 0, Math.PI * 2);
-    ctx.fillStyle = toCss(i % 2 === 0 ? shadow : highlight, 0.16);
+    ctx.ellipse(x, by, r * 1.05, r * 0.16, 0, 0, Math.PI * 2);
+    ctx.fillStyle = toCss(shadow, 0.3);
     ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.strokeStyle = toCss(shadow, 0.5);
+    ctx.stroke();
   }
   ctx.restore();
 }
 
-/** A faceted gem/ice-crystal look: straight edges, triangular shading
- *  fanning out from the centre so it reads as cut rather than round. */
+/** A faceted gem/ice-crystal look: straight edges, flat triangular shading
+ *  fanning out from the centre, bold ink outline — cut, not round. */
 function drawCrystal(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -148,10 +232,7 @@ function drawCrystal(
   ctx.beginPath();
   verts.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
   ctx.closePath();
-  const gradient = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-  gradient.addColorStop(0, toCss(highlight));
-  gradient.addColorStop(1, toCss(base));
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = toCss(base);
   ctx.fill();
 
   for (let i = 0; i < sides; i++) {
@@ -162,69 +243,126 @@ function drawCrystal(
     ctx.lineTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.closePath();
-    ctx.fillStyle = toCss(i % 2 === 0 ? highlight : shadow, 0.2);
+    ctx.fillStyle = toCss(i % 2 === 0 ? highlight : shadow, 0.28);
     ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.025);
+    ctx.strokeStyle = toCss(mix(base, [255, 255, 255], 0.5), 0.6);
+    ctx.stroke();
   }
 
-  ctx.strokeStyle = toCss(mix(base, [255, 255, 255], 0.6), 0.8);
-  ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.beginPath();
+  verts.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
+  ctx.closePath();
+  ctx.lineWidth = inkWidth(r);
+  ctx.strokeStyle = INK;
   ctx.stroke();
 }
 
-/** A shaded, textured planet — round, rocky, banded or a faceted crystal —
- *  with an optional ring, so each one reads as its own place rather than a
- *  flat colored disc. */
+/** A solid, outlined band — drawn as a filled ellipse ring rather than a
+ *  thin translucent stroke, so it reads as a chunky cartoon prop. */
+function drawRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, base: Rgb): void {
+  const rotation = -0.2;
+  const outerRx = r * 1.95;
+  const outerRy = r * 0.6;
+  const bandWidth = Math.max(3, r * 0.26);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(x, y, outerRx, outerRy, rotation, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.ellipse(x, y, outerRx - bandWidth, outerRy - bandWidth * 0.32, rotation, 0, Math.PI * 2, true);
+  ctx.closePath();
+  ctx.fillStyle = toCss(mix(base, [255, 255, 255], 0.35));
+  ctx.fill("evenodd");
+  ctx.lineWidth = inkWidth(r) * 0.8;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(x, y, outerRx - bandWidth, outerRy - bandWidth * 0.32, rotation, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A cel-shaded, textured planet — round, rocky, banded or a faceted
+ *  crystal — with a bold cartoon ink outline and an optional ring. */
 function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   const { x, y } = planet.pos;
   const r = planet.radius;
   const seed = hashId(planet.id);
   const base = hexToRgb(planet.color ?? DEFAULT_PLANET_COLOR);
   const highlight = mix(base, [255, 255, 255], 0.55);
-  const shadow = mix(base, [0, 0, 0], 0.35);
+  const shadow = mix(base, [0, 0, 0], 0.4);
   const shape = planet.shape ?? "round";
 
-  if (planet.ring) {
-    ctx.beginPath();
-    ctx.ellipse(x, y, r * 1.9, r * 0.55, -0.2, 0, Math.PI * 2);
-    ctx.strokeStyle = toCss(mix(base, [255, 255, 255], 0.3), 0.85);
-    ctx.lineWidth = Math.max(2, r * 0.22);
-    ctx.stroke();
-  }
+  if (planet.ring) drawRing(ctx, x, y, r, base);
 
   if (planet.isGoal) {
-    ctx.beginPath();
-    ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255, 209, 102, 0.3)";
-    ctx.fill();
+    const beams = 8;
+    ctx.save();
+    for (let i = 0; i < beams; i++) {
+      const angle = (i / beams) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(angle) * r * 1.15, y + Math.sin(angle) * r * 1.15);
+      ctx.lineTo(x + Math.cos(angle) * r * 1.7, y + Math.sin(angle) * r * 1.7);
+      ctx.lineWidth = Math.max(2, r * 0.1);
+      ctx.strokeStyle = "rgba(255, 214, 102, 0.55)";
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   if (shape === "crystal") {
     drawCrystal(ctx, x, y, r, seed, base, highlight, shadow);
+  } else if (shape === "rocky") {
+    fillCelShaded(ctx, () => tracePath(ctx, x, y, r, seed), x, y, r, base, highlight, shadow);
+    drawCraters(ctx, x, y, r, seed, shadow);
   } else {
-    const isRocky = shape === "rocky";
-    if (isRocky) tracePath(ctx, x, y, r, seed);
-    else {
+    const path = () => {
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
-    }
-
-    const sphere = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
-    sphere.addColorStop(0, toCss(highlight));
-    sphere.addColorStop(0.6, toCss(base));
-    sphere.addColorStop(1, toCss(shadow));
-    ctx.fillStyle = sphere;
-    ctx.fill();
-
-    if (isRocky) drawCraters(ctx, x, y, r, seed, shadow);
-    if (shape === "banded") drawBands(ctx, x, y, r, highlight, shadow);
+    };
+    fillCelShaded(ctx, path, x, y, r, base, highlight, shadow);
+    if (shape === "banded") drawBands(ctx, x, y, r, shadow);
   }
 
   if (planet.isGoal) {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(2, r * 0.06);
     ctx.strokeStyle = "#fff3c4";
-    ctx.lineWidth = 3;
     ctx.stroke();
+  }
+}
+
+/** A round cartoon character with a bold outline and a simple face — the
+ *  face stays screen-facing (not rotated with the surface) so it always
+ *  reads, the way a rolling character's face conventionally does. */
+function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = inkWidth(r);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(x - r * 0.3, y - r * 0.35, r * 0.3, r * 0.18, -0.4, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+  ctx.fill();
+
+  const eyeDx = r * 0.32;
+  const eyeDy = r * 0.05;
+  const eyeR = Math.max(1, r * 0.16);
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(x + dir * eyeDx, y + eyeDy, eyeR, 0, Math.PI * 2);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + dir * eyeDx + eyeR * 0.3, y + eyeDy - eyeR * 0.3, eyeR * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
   }
 }
 
@@ -240,13 +378,13 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
   const flash =
     state.outcome === "won" ? "#ffd166" : state.outcome === "lost" ? "#c1443c" : null;
 
-  ctx.beginPath();
-  ctx.arc(state.player.pos.x, state.player.pos.y, state.player.radius, 0, Math.PI * 2);
-  ctx.fillStyle = flash ?? "#ff5d73";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#3c1a24";
-  ctx.stroke();
+  drawPlayer(
+    ctx,
+    state.player.pos.x,
+    state.player.pos.y,
+    state.player.radius,
+    flash ?? "#ff5d73",
+  );
 
   if (flash) {
     ctx.fillStyle = flash;

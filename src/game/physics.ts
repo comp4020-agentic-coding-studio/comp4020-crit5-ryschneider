@@ -4,10 +4,10 @@ import type { InputSnapshot, Planet, PlayerState, Vec2 } from "./types";
 // so the ship's speed scales along with the world instead of feeling weaker
 // on a bigger window — `rules.ts` scales the whole layout, player included,
 // to fill whatever screen it's given.
-const MOVE_ACCEL_PER_RADIUS = 130;
+const MOVE_ACCEL_PER_RADIUS = 50;
 const MAX_SURFACE_SPEED_PER_RADIUS = 42;
 const JUMP_SPEED_PER_RADIUS = 24;
-const AIR_CONTROL_ACCEL_PER_RADIUS = 36;
+const AIR_CONTROL_ACCEL_PER_RADIUS = 14;
 const SURFACE_SNAP_EPSILON = 0.05;
 /** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
 const FRICTION_DECEL_PER_RADIUS = 70;
@@ -104,7 +104,7 @@ export function integrate(
   dt: number,
   groundedPlanet: Planet | null,
 ): PlayerState {
-  const moveDir = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+  const moveDir = ((input.left ? -1 : 0) + (input.right ? 1 : 0)) as -1 | 0 | 1;
   const moveAccel = MOVE_ACCEL_PER_RADIUS * player.radius;
   const maxSurfaceSpeed = MAX_SURFACE_SPEED_PER_RADIUS * player.radius;
   const jumpSpeed = JUMP_SPEED_PER_RADIUS * player.radius;
@@ -124,6 +124,7 @@ export function integrate(
         pos: add(player.pos, scale(vel, dt)),
         grounded: false,
         groundedPlanetId: null,
+        thrustDir: moveDir,
       };
     }
 
@@ -158,6 +159,7 @@ export function integrate(
       pos,
       grounded: true,
       groundedPlanetId: groundedPlanet.id,
+      thrustDir: moveDir,
     };
   }
 
@@ -178,5 +180,6 @@ export function integrate(
     pos: add(player.pos, scale(vel, dt)),
     grounded: false,
     groundedPlanetId: null,
+    thrustDir: moveDir,
   };
 }

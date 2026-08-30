@@ -278,11 +278,47 @@ function drawRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number
   ctx.restore();
 }
 
+/** A black hole: a dark core, a violet accretion-glow halo, and a couple of
+ *  swept arcs standing in for an accretion disk — deliberately unlike every
+ *  other planet's cel-shaded look, so it reads as "don't land here" at a
+ *  glance rather than as just another stop. */
+function drawBlackHole(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  const glow = ctx.createRadialGradient(x, y, r * 0.4, x, y, r * 2);
+  glow.addColorStop(0, "rgba(150, 80, 220, 0.55)");
+  glow.addColorStop(1, "rgba(150, 80, 220, 0)");
+  ctx.beginPath();
+  ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+  ctx.fillStyle = glow;
+  ctx.fill();
+
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * (1.25 + i * 0.3), r * (0.4 + i * 0.1), -0.3, 0, Math.PI * 1.3);
+    ctx.lineWidth = Math.max(1.5, r * 0.06);
+    ctx.strokeStyle = "rgba(200, 150, 255, 0.65)";
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#0a0612";
+  ctx.fill();
+  ctx.lineWidth = inkWidth(r);
+  ctx.strokeStyle = INK;
+  ctx.stroke();
+}
+
 /** A cel-shaded, textured planet — round, rocky, banded or a faceted
  *  crystal — with a bold cartoon ink outline and an optional ring. */
 function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   const { x, y } = planet.pos;
   const r = planet.radius;
+
+  if (planet.lethal) {
+    drawBlackHole(ctx, x, y, r);
+    return;
+  }
+
   const seed = hashId(planet.id);
   const base = hexToRgb(planet.color ?? DEFAULT_PLANET_COLOR);
   const highlight = mix(base, [255, 255, 255], 0.55);
@@ -329,13 +365,16 @@ function drawPlanet(ctx: CanvasRenderingContext2D, planet: Planet): void {
   }
 }
 
-/** A small cartoon rocket ship — pointed nose, tapered body, fins and a
- *  cockpit window — oriented along its direction of travel (or straight
- *  "up" off the surface while standing still) so the existing acceleration
- *  mechanic reads as thrust rather than an arbitrary circle sliding around.
- *  `angle` is the rotation that points the ship's nose at the facing
- *  direction; `thrust` (0-1) scales the engine flame so speeding up is
- *  visibly bigger fire, not just a faster-moving dot. */
+/** A small cartoon rocket ship — pointed nose, tapered body, fins, side
+ *  RCS thruster pods and a cockpit window — oriented along its direction of
+ *  travel (or straight "up" off the surface while standing still) so the
+ *  existing acceleration mechanic reads as thrust rather than an arbitrary
+ *  circle sliding around. `angle` is the rotation that points the ship's
+ *  nose at the facing direction; `thrust` (0-1) scales the main engine
+ *  flame so speeding up is visibly bigger fire, not just a faster-moving
+ *  dot; `thrustDir` fires the opposite-side pod (real RCS thrusters push by
+ *  venting away from the direction you want to move) whenever left/right is
+ *  actually held, independent of `thrust`. */
 function drawPlayer(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -344,6 +383,7 @@ function drawPlayer(
   fill: string,
   angle: number,
   thrust: number,
+  thrustDir: -1 | 0 | 1,
 ) {
   ctx.save();
   ctx.translate(x, y);
@@ -385,6 +425,39 @@ function drawPlayer(
     ctx.closePath();
     ctx.fillStyle = INK;
     ctx.fill();
+  }
+
+  // Side thruster pods, mid-hull — always visible so the ship reads as
+  // having a way to push itself sideways even at rest.
+  const podOffsetX = r * 0.62;
+  const podW = r * 0.22;
+  const podH = r * 0.3;
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.rect(dir * podOffsetX - podW / 2, -podH / 2, podW, podH);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, inkWidth(r) * 0.7);
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  }
+
+  // Firing pod vents away from the direction you're pushing toward — that's
+  // what actually makes it thrust the ship the other way.
+  if (thrustDir !== 0) {
+    const firingSide = -thrustDir;
+    const podX = firingSide * podOffsetX;
+    const flameLen = r * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(podX, -podH * 0.45);
+    ctx.lineTo(podX + firingSide * flameLen, 0);
+    ctx.lineTo(podX, podH * 0.45);
+    ctx.closePath();
+    ctx.fillStyle = "#ffd166";
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, inkWidth(r) * 0.6);
+    ctx.strokeStyle = INK;
+    ctx.stroke();
   }
 
   ctx.beginPath();
@@ -452,6 +525,7 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState): void {
     flash ?? "#ff5d73",
     shipAngle(state),
     shipThrust(state),
+    state.player.thrustDir,
   );
 
   if (flash) {

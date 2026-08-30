@@ -11,7 +11,7 @@ function planet(
   mass: number,
   isGoal = false,
   color?: string,
-  opts: Pick<Planet, "ring" | "shape" | "friction"> = {},
+  opts: Pick<Planet, "ring" | "shape" | "friction" | "lethal"> = {},
 ): Planet {
   return { id, pos, radius, mass, isGoal, color, ...opts };
 }
@@ -32,32 +32,30 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
   const at = (x: number, y: number): Vec2 => ({ x: offsetX + x * scale, y: offsetY + y * scale });
 
   const planets: Planet[] = [
-    planet("start", at(220, 340), 70 * scale, 260, false, "#d98a5f", {
+    planet("start", at(190, 390), 70 * scale, 260, false, "#d98a5f", {
       shape: "rocky",
       friction: 1.2,
     }),
-    planet("zephyr", at(400, 70), 30 * scale, 110, false, "#bfeeff", {
+    planet("zephyr", at(400, 130), 30 * scale, 110, false, "#bfeeff", {
       shape: "crystal",
       friction: 0.05,
     }),
-    planet("mid", at(500, 220), 50 * scale, 190, false, "#4fa5c9", {
+    planet("mid", at(560, 250), 50 * scale, 190, false, "#4fa5c9", {
       shape: "round",
       friction: 1.2,
     }),
-    planet("aurora", at(80, 150), 38 * scale, 140, false, "#9b7fd4", {
-      shape: "banded",
-      friction: 1.4,
-    }),
-    planet("ember", at(650, 480), 45 * scale, 170, false, "#e0b878", {
+    planet("ember", at(700, 400), 45 * scale, 170, false, "#e0b878", {
       ring: true,
       shape: "rocky",
       friction: 1.3,
     }),
-    planet("outpost", at(900, 500), 35 * scale, 130, false, "#e8829a", {
-      shape: "rocky",
-      friction: 1.5,
+    // A small, strongly-pulling void guarding the direct line between "mid"
+    // and "goal" — still summed into gravityAt like any other planet, but
+    // checkOutcome kills on contact instead of letting you land on it.
+    planet("void", at(650, 120), 25 * scale, 380, false, "#0a0612", {
+      lethal: true,
     }),
-    planet("goal", at(760, 360), 60 * scale, 230, true, "#ffd166", {
+    planet("goal", at(810, 180), 60 * scale, 230, true, "#ffd166", {
       shape: "round",
       friction: 1.2,
     }),
@@ -75,6 +73,7 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
       radius: playerRadius,
       grounded: true,
       groundedPlanetId: startPlanet.id,
+      thrustDir: 0,
     },
     outcome: "playing",
     worldBounds: {
@@ -88,13 +87,25 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
 }
 
 /** Win: landed on the goal planet. Loss: drifted past the world bounds with
- *  no planet's gravity having recaptured the player. */
+ *  no planet's gravity having recaptured the player, or touched a lethal
+ *  planet (a black hole) outright. */
 export function checkOutcome(state: GameState): GameState["outcome"] {
   if (state.outcome !== "playing") return state.outcome;
 
   const goal = state.planets.find((p) => p.isGoal);
   if (goal && state.player.grounded && state.player.groundedPlanetId === goal.id) {
     return "won";
+  }
+
+  // Checked by raw overlap distance rather than the `grounded` flag, so a
+  // last-instant jump the same frame you touch it can't dodge death.
+  for (const hazard of state.planets) {
+    if (!hazard.lethal) continue;
+    const dx = state.player.pos.x - hazard.pos.x;
+    const dy = state.player.pos.y - hazard.pos.y;
+    if (Math.hypot(dx, dy) <= hazard.radius + state.player.radius) {
+      return "lost";
+    }
   }
 
   const { minX, maxX, minY, maxY, margin } = state.worldBounds;

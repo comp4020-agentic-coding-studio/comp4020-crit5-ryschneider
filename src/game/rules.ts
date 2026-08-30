@@ -11,9 +11,9 @@ function planet(
   mass: number,
   isGoal = false,
   color?: string,
-  ring?: boolean,
+  opts: Pick<Planet, "ring" | "shape" | "friction"> = {},
 ): Planet {
-  return { id, pos, radius, mass, isGoal, color, ring };
+  return { id, pos, radius, mass, isGoal, color, ...opts };
 }
 
 /**
@@ -32,13 +32,35 @@ export function createInitialState(width = REF_WIDTH, height = REF_HEIGHT): Game
   const at = (x: number, y: number): Vec2 => ({ x: offsetX + x * scale, y: offsetY + y * scale });
 
   const planets: Planet[] = [
-    planet("start", at(220, 340), 70 * scale, 260, false, "#d98a5f"),
-    planet("zephyr", at(400, 70), 30 * scale, 110, false, "#8fe0c4"),
-    planet("mid", at(500, 220), 50 * scale, 190, false, "#4fa5c9"),
-    planet("aurora", at(80, 150), 38 * scale, 140, false, "#9b7fd4"),
-    planet("ember", at(650, 480), 45 * scale, 170, false, "#e0b878", true),
-    planet("outpost", at(900, 500), 35 * scale, 130, false, "#e8829a"),
-    planet("goal", at(760, 360), 60 * scale, 230, true, "#ffd166"),
+    planet("start", at(220, 340), 70 * scale, 260, false, "#d98a5f", {
+      shape: "rocky",
+      friction: 1.2,
+    }),
+    planet("zephyr", at(400, 70), 30 * scale, 110, false, "#bfeeff", {
+      shape: "crystal",
+      friction: 0.05,
+    }),
+    planet("mid", at(500, 220), 50 * scale, 190, false, "#4fa5c9", {
+      shape: "round",
+      friction: 1.2,
+    }),
+    planet("aurora", at(80, 150), 38 * scale, 140, false, "#9b7fd4", {
+      shape: "banded",
+      friction: 1.4,
+    }),
+    planet("ember", at(650, 480), 45 * scale, 170, false, "#e0b878", {
+      ring: true,
+      shape: "rocky",
+      friction: 1.3,
+    }),
+    planet("outpost", at(900, 500), 35 * scale, 130, false, "#e8829a", {
+      shape: "rocky",
+      friction: 1.5,
+    }),
+    planet("goal", at(760, 360), 60 * scale, 230, true, "#ffd166", {
+      shape: "round",
+      friction: 1.2,
+    }),
   ];
 
   const startPlanet = planets[0]!;

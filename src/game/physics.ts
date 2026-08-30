@@ -5,6 +5,10 @@ const MAX_SURFACE_SPEED = 95;
 const JUMP_SPEED = 130;
 const AIR_CONTROL_ACCEL = 40;
 const SURFACE_SNAP_EPSILON = 0.05;
+/** How fast un-pressed speed bleeds off, before a planet's `friction` scales it. */
+const FRICTION_DECEL = 260;
+/** Even on the iciest planet, input still steers at least this fraction as hard. */
+const MIN_ACCEL_GRIP = 0.3;
 
 function subtract(a: Vec2, b: Vec2): Vec2 {
   return { x: a.x - b.x, y: a.y - b.y };
@@ -105,10 +109,19 @@ export function integrate(
       };
     }
 
-    const tangentialSpeed = Math.max(
-      -MAX_SURFACE_SPEED,
-      Math.min(MAX_SURFACE_SPEED, dot(player.vel, tangent) + moveDir * MOVE_ACCEL * dt),
-    );
+    const friction = groundedPlanet.friction ?? 1;
+    const accelGrip = Math.max(friction, MIN_ACCEL_GRIP);
+    let rawSpeed = dot(player.vel, tangent) + moveDir * MOVE_ACCEL * accelGrip * dt;
+
+    // Friction only bleeds off speed the player isn't actively driving with
+    // input — otherwise holding a direction into high friction would fight
+    // its own acceleration instead of just capping top speed.
+    if (moveDir === 0) {
+      const decel = FRICTION_DECEL * friction * dt;
+      rawSpeed = rawSpeed > 0 ? Math.max(0, rawSpeed - decel) : Math.min(0, rawSpeed + decel);
+    }
+
+    const tangentialSpeed = Math.max(-MAX_SURFACE_SPEED, Math.min(MAX_SURFACE_SPEED, rawSpeed));
     const vel = scale(tangent, tangentialSpeed);
     const restRadius = groundedPlanet.radius + player.radius;
 

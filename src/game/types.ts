@@ -13,6 +13,14 @@ export interface Planet {
   color?: string;
   /** Draws a Saturn-style ring behind the sphere. */
   ring?: boolean;
+  /** Visual silhouette; falls back to "round" if omitted. Physics always
+   *  treats the planet as the circle described by `radius` regardless of
+   *  shape — only the drawing varies. */
+  shape?: "round" | "rocky" | "crystal" | "banded";
+  /** Surface grip multiplier for walking, 1 = normal. Low values (an icy
+   *  planet) mean weak acceleration and almost no stopping friction, so the
+   *  player keeps sliding. Falls back to 1 if omitted. */
+  friction?: number;
 }
 
 export interface PlayerState {
